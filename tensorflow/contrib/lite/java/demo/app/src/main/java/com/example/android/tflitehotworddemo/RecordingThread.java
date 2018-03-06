@@ -15,7 +15,7 @@ import java.util.LinkedList;
 
 public class RecordingThread {
     private static final String TAG = "RecordingThread";
-    private static final String modelDir = "xiaobudian_0.068.tflite";
+    private static final String modelDir = "xiaobudian_0.037.tflite";//"xiaobudian_0.037_dummy_quantized.tflite";
     private static final int sampleRate = 16000;
     private static final int signalLength = 3680;
     private static final boolean needDebug = true;
@@ -59,7 +59,7 @@ public class RecordingThread {
 
     public RecordingThread(Activity activity, Context current) {
         try {
-            tensorFlowKeywordSpotting = new TensorFlowKeywordSpotting(activity, modelDir);
+            tensorFlowKeywordSpotting = new TensorFlowKeywordSpotting(activity);
         } catch (IOException e) {
             e.printStackTrace();
             Log.e(TAG, "Failed to initialize a keyword spotting classifier.");
@@ -101,18 +101,18 @@ public class RecordingThread {
         triggerClassify = false;
         historyVolume.clear();
 
+        // one-turn use
+        float[] lastPackage = new float[0];
+        boolean firstTrigger = true;
+
         if (needDebug) {
             Log.v(TAG, "Start");
         }
         // read 1 sec each time
-        /*
-        int bufferSize = (int) (SAMPLE_RATE * 2);
+
+        int bufferSize = (int) (sampleRate * 2);
         if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
-            bufferSize = SAMPLE_RATE * 2;
-        }*/
-        int bufferSize = (int) (signalLength * 2);
-        if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
-            bufferSize = signalLength * 2;
+            bufferSize = sampleRate * 2;
         }
         // 225ms per package
         byte[] audioBuffer = new byte[signalLength * 2];
@@ -142,11 +142,12 @@ public class RecordingThread {
             //    1. not too high for loud device (vad_sum < 200f);
             //    2. history volume (last 2s) is not too loud, which
             //       is to avoid increase noise (avg_volume < 90f);
+            /*
             if (vadSum < 200f && avgVolume < 90f) {
                 for (int i = 0; i < floatValues.length; i ++) {
                     floatValues[i] *= volumeIncreaseTime;
                 }
-            }
+            }*/
             if (vadSum > Math.max(avgVolume, vadThreshold)) {
                 nonSpeechCount = 0;
                 triggerClassify = true;
@@ -165,8 +166,14 @@ public class RecordingThread {
             if (triggerClassify) {
                 Log.e(TAG, "run classify!!!");
                 long startTime = SystemClock.uptimeMillis();
-                this.tensorFlowKeywordSpotting.feed(floatValues);
-                triggerHotword = this.tensorFlowKeywordSpotting.classify();
+                if (firstTrigger && lastPackage.length > 0) {
+                    firstTrigger = false;
+                    tensorFlowKeywordSpotting.feed(lastPackage);
+                    tensorFlowKeywordSpotting.classify();
+                }
+                tensorFlowKeywordSpotting.feed(floatValues);
+                triggerHotword = tensorFlowKeywordSpotting.classify();
+                tensorFlowKeywordSpotting.getDecodeResult();
                 long endTime = SystemClock.uptimeMillis();
                 Log.d(TAG, "Timecost to run Classify: " + Long.toString(endTime - startTime));
             }
@@ -181,7 +188,9 @@ public class RecordingThread {
                 tensorFlowKeywordSpotting.clear();
                 nonSpeechCount = 0;
                 triggerClassify = false;
+                firstTrigger = true;
             }
+            lastPackage = floatValues.clone();
         }
         record.stop();
         record.release();

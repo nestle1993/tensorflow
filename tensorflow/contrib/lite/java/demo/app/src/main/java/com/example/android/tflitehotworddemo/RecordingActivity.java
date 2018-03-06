@@ -30,6 +30,18 @@ public class RecordingActivity  extends Activity {
         startButton.setEnabled(true);
         stopButton = (Button)findViewById(R.id.record_stop);
         stopButton.setEnabled(false);
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onClickRecord(v);
+            }
+        });
+        stopButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onClickStopRecord(v);
+            }
+        });
     }
     public void onClickRecord(View v){
         startButton.setEnabled(false);
