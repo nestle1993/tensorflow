@@ -18,6 +18,8 @@ package com.example.android.tflitecamerademo;
 import android.app.Activity;
 import android.os.Bundle;
 
+import com.example.android.tflitecamerademo.R;
+
 /** Main {@code Activity} class for the Camera app. */
 public class CameraActivity extends Activity {
 
